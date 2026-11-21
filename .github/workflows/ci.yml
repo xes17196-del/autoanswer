@@ -1,0 +1,50 @@
+name: Build APK (fixed)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show files
+        run: ls -la
+
+      - name: Unzip project
+        run: unzip -q AutoAnswerApp.zip
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
+      - name: Install SDK
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0" > /dev/null
+
+      - name: Install Gradle
+        run: |
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.9-bin.zip -o /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp/gradle
+          echo "/tmp/gradle/gradle-8.9/bin" >> "$GITHUB_PATH"
+
+      - name: Build
+        working-directory: ./AutoAnswerApp
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Show APK
+        run: ls -lh AutoAnswerApp/app/build/outputs/apk/debug/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: autoanswer-apk
+          path: AutoAnswerApp/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
