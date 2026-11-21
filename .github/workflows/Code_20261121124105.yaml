@@ -1,0 +1,57 @@
+name: Build APK v2
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 解压工程
+        run: |
+          ls -la
+          unzip -q AutoAnswerApp.zip
+          ls -la AutoAnswerApp
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 装 Android SDK 命令行工具
+        run: |
+          mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
+          cd $ANDROID_SDK_ROOT/cmdline-tools
+          curl -sSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/cmd.zip
+          unzip -q /tmp/cmd.zip
+          mv cmdline-tools latest
+          echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools" >> $GITHUB_PATH
+
+      - name: 装 SDK 平台与构建工具
+        run: |
+          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --licenses
+          sdkmanager --sdk_root=$ANDROID_SDK_ROOT "platforms;android-35" "build-tools;35.0.0"
+
+      - name: 装 Gradle 8.9
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-8.9-bin.zip -o /tmp/g.zip
+          unzip -q /tmp/g.zip -d /opt
+          echo "/opt/gradle-8.9/bin" >> $GITHUB_PATH
+
+      - name: 编译
+        working-directory: ./AutoAnswerApp
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: 产物
+        run: ls -lh AutoAnswerApp/app/build/outputs/apk/debug/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: autoanswer-apk
+          path: AutoAnswerApp/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
